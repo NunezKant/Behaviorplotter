@@ -1,0 +1,4 @@
+name: Behaviorplotter
+channels:
+  - defaults
+prefix: /home/mano/miniconda3/envs/Behaviorplotter
