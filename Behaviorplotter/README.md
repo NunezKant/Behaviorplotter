@@ -1,3 +1,3 @@
 # BehaviorPlotter
 
-Small script that analyzes the lick behavior in a task 
+Small script that analyzes mouse lick behavior in a cognitive task 
