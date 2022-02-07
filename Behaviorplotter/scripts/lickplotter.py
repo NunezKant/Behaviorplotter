@@ -16,7 +16,7 @@ Licks = data['Licks']
 RewardArray = np.array(data['Rewardposition'])
 LickDf = pd.DataFrame(Licks, columns=['Trial','Position','Alpha','Rewarded','ts'])
 LickDf['Position'] = LickDf['Position']*10
-RewardArray = np.append(RewardArray.T,np.repeat(0,LickDf['Trial'].max() - len(RewardArray.T)))
+RewardArray = np.append(RewardArray.T,np.repeat(0,np.abs(LickDf['Trial'].max() - len(RewardArray.T))))
 
 
 Reward_Durationdf = pd.DataFrame(RewardArray*10, columns=['Reward'])
