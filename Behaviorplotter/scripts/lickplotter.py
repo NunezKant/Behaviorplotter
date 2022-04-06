@@ -1,45 +1,202 @@
-import scipy.io
 from tkinter import Tk   
 from tkinter.filedialog import askopenfilename
 import seaborn as sns
 import pandas as pd 
 import matplotlib.pyplot as plt
 import numpy as np
+import mat73
+from datetime import datetime, timedelta
+
 sns.set_context("paper")
 plt.style.use('bmh')
 
+def get_dataframes(data):
+    """
+    Get the dataframes from the data
+
+    Parameters
+    ----------
+    data : dict
+        Data dictionary.
+
+    Returns
+    -------
+    lick_df : dataframe
+        Dataframe with the lick data.
+    reward_info: dataframe
+        Dataframe with the reward information.
+    """
+    licks = data["Licks"]
+
+    lick= pd.DataFrame(
+        licks, columns=["Trial", "Position", "Alpha", "Rewarded", "ts", "start"]
+    )
+    lick["Datetime"] = pd.to_datetime(
+        lick["ts"].apply(
+            lambda x: datetime.fromordinal(int(x))
+            + timedelta(days=x % 1)
+            - timedelta(days=366)
+        )
+    )
+    lick = lick.drop(["ts"], axis=1)
+    total_trials = int(lick["Trial"].max())
+    if len(data.keys()) > 5:
+        lick["Category"] = np.nan
+        categories, _ = get_trial_categories(
+            data["TrialRewardStrct"], data["TrialNewTextureStrct"]
+        )[:total_trials]
+        for trial in lick["Trial"].unique():
+            lick.loc[
+                np.where(lick["Trial"] == int(trial))[0], "Category"
+            ] = categories[int(trial - 1)]
+    reward = pd.DataFrame(
+        data["RewardInfo"][:total_trials, :], columns=["Position", "Datetime"]
+    )
+    rewardr = reward.copy()
+    lickr = lick.copy()
+    rewardr.loc[:,"Position"] *= 10
+    lickr.loc[:,"Position"] *= 10
+    return lickr, rewardr
+
+def get_trial_categories(rewarded_trial_structure, new_trial_structure):
+    """
+    Compute the trial categories for the new trial structure
+
+    Parameters
+    ----------
+    rewarded_trial_structure : array
+        vector of the rewarded trials.
+    new_trial_structure : array
+        vector with new exemplar trials.
+
+    Returns
+    -------
+    trial_categories : list
+        List of the trial categories.
+    trial_counts : dict
+        Dictionary with the trial categories counts.
+
+    """
+    rewarded_trial_structure = np.array(rewarded_trial_structure)
+    new_trial_structure = np.array(new_trial_structure)
+    trial_categories = [None] * len(rewarded_trial_structure)
+    rewarded_new_counter = 0
+    rewarded_counter = 0
+    non_rewarded_counter = 0
+    non_rewarded_new_counter = 0
+
+    for idx in range(new_trial_structure.shape[0]):
+        if np.logical_and(rewarded_trial_structure[idx], new_trial_structure[idx]):
+            trial_categories[idx] = "rewarded new"
+            rewarded_new_counter += 1
+        elif np.logical_and(
+            rewarded_trial_structure[idx], np.logical_not(new_trial_structure[idx])
+        ):
+            trial_categories[idx] = "rewarded"
+            rewarded_counter += 1
+        elif np.logical_and(
+            np.logical_not(rewarded_trial_structure[idx]), new_trial_structure[idx]
+        ):
+            trial_categories[idx] = "non rewarded new"
+            non_rewarded_new_counter += 1
+        elif np.logical_and(
+            np.logical_not(rewarded_trial_structure[idx]),
+            np.logical_not(new_trial_structure[idx]),
+        ):
+            trial_categories[idx] = "non rewarded"
+            non_rewarded_counter += 1
+
+        trial_counts = {
+            "rewarded new": rewarded_new_counter,
+            "rewarded": rewarded_counter,
+            "non rewarded new": non_rewarded_new_counter,
+            "non rewarded": non_rewarded_counter,
+        }
+
+    return np.array(trial_categories), trial_counts
+
+def lick_plot(
+    data,
+    first_lick=True,
+    bin_num=60,
+    fig_size=(12, 12),
+):
+    """
+    Plot the lick data.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Dataframe containing the behavior data
+    first_lick : bool
+        If True, plot the first lick distribution over trials.
+    fsize : tuple
+        Figure size.
+
+    Returns
+    -------
+    fig : figure
+        Figure of lick data.
+    """
+
+    fig = plt.figure(figsize=fig_size)
+    grid = plt.GridSpec(5, 5, hspace=0.2, wspace=0.2)
+    main_ax = fig.add_subplot(grid[1:, :4])
+    x_hist = fig.add_subplot(grid[:1, :4], sharex=main_ax)
+
+    lick, reward_df = get_dataframes(data)
+    effective_trial = int(lick["Trial"].max())
+    categories, trial_counts = get_trial_categories(
+        data["TrialRewardStrct"][:effective_trial],
+        data["TrialNewTextureStrct"][:effective_trial],
+    )
+    lick = lick[lick["start"] != 1]
+    category_number = len(np.unique(categories))
+    if category_number == 4:
+        categories = ["rewarded", "non rewarded", "rewarded new", "non rewarded new"]
+    elif category_number == 2:
+        categories = ["rewarded", "non rewarded"]
+
+    if first_lick:
+        lick = lick.groupby("Trial").min().reset_index()
+
+    for category in categories:
+        position = lick[lick["Category"] == category]["Position"]
+        trial = lick[lick["Category"] == category]["Trial"]
+        counts, bins = np.histogram(position, bin_num)
+
+        main_ax.scatter(
+            position,
+            trial,
+            marker="*",
+            label=category,
+            s=10,
+        )
+
+        x_hist.hist(
+            bins[:-1], alpha=0.5, weights=counts / trial_counts[category], bins=bins
+        )
+
+    main_ax.scatter(
+        reward_df["Position"],
+        reward_df.index + 1,
+        s=25,
+        marker="v",
+        label="reward delivery",
+        c="k",
+        alpha=0.3,
+    )
+
+    main_ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    main_ax.set_xlabel("Position (cm)")
+    main_ax.set_ylabel("Trial")
+    main_ax.set_xlim(0, lick["Position"].max() + 10)
+    x_hist.set_xlabel("")
+    sns.despine()
+
 Tk().withdraw() 
 filename = askopenfilename() 
-data = scipy.io.loadmat(filename)
-
-Licks = data['Licks']
-RewardArray = np.array(data['Rewardposition'])
-LickDf = pd.DataFrame(Licks, columns=['Trial','Position','Alpha','Rewarded','ts'])
-LickDf['Position'] = LickDf['Position']*10
-RewardArray = np.append(RewardArray.T,np.repeat(0,np.abs(LickDf['Trial'].max() - len(RewardArray.T))))
-
-
-Reward_Durationdf = pd.DataFrame(RewardArray*10, columns=['Reward'])
-Reward_Durationdf['Reward'].replace({0:np.nan}, inplace=True)
-
-
-RewardedLicks_Df = LickDf[LickDf['Rewarded'] == 1]
-NoRewardedLicks_Df = LickDf[LickDf['Rewarded'] == 0]
-
-fig = plt.figure(figsize=(10, 10))
-grid = plt.GridSpec(5, 5, hspace=0.2, wspace=0.2)
-
-main_ax = fig.add_subplot(grid[1:,:4])
-x_hist = fig.add_subplot(grid[:1, :4], yticklabels=[], sharex=main_ax)
-
-main_ax.scatter(NoRewardedLicks_Df['Position'],NoRewardedLicks_Df['Trial'],label='no rewarded',s=5,alpha=0.5)
-main_ax.scatter(RewardedLicks_Df['Position'],RewardedLicks_Df['Trial'], marker='*',label='rewarded',s=5,alpha=0.8)
-main_ax.scatter(Reward_Durationdf['Reward'],Reward_Durationdf.index+1,s=20,marker='v', label='reward delivery')
-main_ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-main_ax.set_xlabel('Position (cm)')
-main_ax.set_ylabel('Trial')
-main_ax.set_xlim(-2,LickDf['Position'].max()+2)
-sns.kdeplot(data=LickDf, x='Position',ax=x_hist,hue='Rewarded',legend=False)
-x_hist.set_xlabel('')
-sns.despine()
+Timeline = mat73.loadmat(filename,only_include='Timeline/Results')
+data = Timeline['Timeline']['Results']
+lick_plot(data, first_lick=True, fig_size=(15,15), bin_num=60)
 plt.show()
