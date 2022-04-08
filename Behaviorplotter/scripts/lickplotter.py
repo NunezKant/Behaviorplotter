@@ -1,14 +1,15 @@
-from tkinter import Tk   
+from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 import seaborn as sns
-import pandas as pd 
+import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import mat73
 from datetime import datetime, timedelta
 
 sns.set_context("paper")
-plt.style.use('bmh')
+plt.style.use("bmh")
+
 
 def get_dataframes(data):
     """
@@ -28,7 +29,7 @@ def get_dataframes(data):
     """
     licks = data["Licks"]
 
-    lick= pd.DataFrame(
+    lick = pd.DataFrame(
         licks, columns=["Trial", "Position", "Alpha", "Rewarded", "ts", "start"]
     )
     lick["Datetime"] = pd.to_datetime(
@@ -46,17 +47,18 @@ def get_dataframes(data):
             data["TrialRewardStrct"], data["TrialNewTextureStrct"]
         )[:total_trials]
         for trial in lick["Trial"].unique():
-            lick.loc[
-                np.where(lick["Trial"] == int(trial))[0], "Category"
-            ] = categories[int(trial - 1)]
+            lick.loc[np.where(lick["Trial"] == int(trial))[0], "Category"] = categories[
+                int(trial - 1)
+            ]
     reward = pd.DataFrame(
         data["RewardInfo"][:total_trials, :], columns=["Position", "Datetime"]
     )
     rewardr = reward.copy()
     lickr = lick.copy()
-    rewardr.loc[:,"Position"] *= 10
-    lickr.loc[:,"Position"] *= 10
+    rewardr.loc[:, "Position"] *= 10
+    lickr.loc[:, "Position"] *= 10
     return lickr, rewardr
+
 
 def get_trial_categories(rewarded_trial_structure, new_trial_structure):
     """
@@ -115,6 +117,7 @@ def get_trial_categories(rewarded_trial_structure, new_trial_structure):
 
     return np.array(trial_categories), trial_counts
 
+
 def get_trials_with_onelick(data, xlim=(45, 110)):
     """
     Create a dataframe with the trials with at least one lick
@@ -135,7 +138,7 @@ def get_trials_with_onelick(data, xlim=(45, 110)):
     lick_pct = []
     lick_pct_dict = {}
     for key, item in trial_counts.items():
-        if item>0:
+        if item > 0:
             trials_with_licks = len(
                 lick_df_wo_startflag.loc[
                     (lick_df_wo_startflag["Category"] == key)
@@ -150,11 +153,14 @@ def get_trials_with_onelick(data, xlim=(45, 110)):
             lick_pct_dict[key] = lick_pct[-1]
     return lick_pct_dict
 
+
 def lick_plot(
     data,
     first_lick=True,
     bin_num=60,
     fig_size=(12, 12),
+    lick_counter_lim=(0,110)
+
 ):
     """
     Plot the lick data.
@@ -167,6 +173,8 @@ def lick_plot(
         If True, plot the first lick distribution over trials.
     fsize : tuple
         Figure size.
+    lick_counter_lim : tuple
+        Limits for the lick counter.
 
     Returns
     -------
@@ -198,9 +206,7 @@ def lick_plot(
         lick = lick.groupby("Trial").min().reset_index()
 
     for key, value in trial_counts.items():
-        lick.loc[
-                np.where(lick["Category"] == key)[0], "Weight"
-            ] = value
+        lick.loc[np.where(lick["Category"] == key)[0], "Weight"] = value
 
     for category in categories:
         position = lick[lick["Category"] == category]["Position"]
@@ -215,11 +221,11 @@ def lick_plot(
             s=10,
         )
 
-        #x_hist.hist(
+        # x_hist.hist(
         #    bins[:-1], alpha=0.5, weights=counts / trial_counts[category], bins=bins
-        #)
+        # )
 
-        pct_axis.bar(category, lick_pct_dict[category]*100, alpha=0.5)
+        pct_axis.bar(category, lick_pct_dict[category] * 100, alpha=0.5)
     main_ax.scatter(
         reward_df["Position"],
         reward_df.index + 1,
@@ -230,10 +236,19 @@ def lick_plot(
         alpha=0.3,
     )
 
-    sns.histplot(data=lick, hue='Category', x="Position", kde=True, weights=1/lick["Weight"], bins=bins, hue_order=categories, ax=x_hist, legend=False)
+    sns.histplot(
+        data=lick,
+        hue="Category",
+        x="Position",
+        kde=True,
+        weights=1 / lick["Weight"],
+        bins=bins,
+        hue_order=categories,
+        ax=x_hist,
+        legend=False,
+    )
 
-    pct_axis.axhline(y=80, color='k', linestyle='--', alpha = 0.5)
-    
+    pct_axis.axhline(y=80, color="k", linestyle="--", alpha=0.5)
 
     main_ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     main_ax.set_xlabel("Position (cm)")
@@ -241,13 +256,14 @@ def lick_plot(
     main_ax.set_xlim(0, lick["Position"].max() + 10)
     pct_axis.set_ylabel("% trials with one lick")
     pct_axis.set_xlabel("")
-    pct_axis.set_ylim(0,100)
+    pct_axis.set_ylim(0, 100)
     x_hist.set_xlabel("")
     sns.despine()
 
-Tk().withdraw() 
-filename = askopenfilename() 
-Timeline = mat73.loadmat(filename,only_include='Timeline/Results')
-data = Timeline['Timeline']['Results']
-lick_plot(data, first_lick=True, fig_size=(15,15), bin_num=60)
+
+Tk().withdraw()
+filename = askopenfilename()
+Timeline = mat73.loadmat(filename, only_include="Timeline/Results")
+data = Timeline["Timeline"]["Results"]
+lick_plot(data, first_lick=True, fig_size=(15, 15), bin_num=60)
 plt.show()
