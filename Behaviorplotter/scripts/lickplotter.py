@@ -189,7 +189,7 @@ def lick_plot(
     pct_axis = fig.add_subplot(grid[:2, 4:])
 
     lick, reward_df = get_dataframes(data)
-    lick_pct_dict = get_trials_with_onelick(data, xlim=(45, 110))
+    lick_pct_dict = get_trials_with_onelick(data, xlim=lick_counter_lim)
     effective_trial = int(lick["Trial"].max())
     categories, trial_counts = get_trial_categories(
         data["TrialRewardStrct"][:effective_trial],
