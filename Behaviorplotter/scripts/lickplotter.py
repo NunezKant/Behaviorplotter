@@ -159,7 +159,7 @@ def lick_plot(
     first_lick=True,
     bin_num=60,
     fig_size=(12, 12),
-    lick_counter_lim=(0,110)
+    lick_counter_lim=(45,110)
 
 ):
     """
